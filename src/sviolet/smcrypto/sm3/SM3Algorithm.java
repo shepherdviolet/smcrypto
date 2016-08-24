@@ -1,6 +1,6 @@
 package sviolet.smcrypto.sm3;
 
-import sviolet.smcrypto.util.Util;
+import sviolet.smcrypto.util.SMCommonUtil;
 
 class SM3Algorithm {
 
@@ -119,11 +119,11 @@ class SM3Algorithm {
     }
 
     private static byte[] bigEndianIntToByte(int num) {
-        return back(Util.intToBytes(num));
+        return back(SMCommonUtil.intToBytes(num));
     }
 
     private static int bigEndianByteToInt(byte[] bytes) {
-        return Util.byteToInt(back(bytes));
+        return SMCommonUtil.byteToInt(back(bytes));
     }
 
     private static int FFj(int X, int Y, int Z, int j) {
@@ -199,7 +199,7 @@ class SM3Algorithm {
         pos += in.length;
         System.arraycopy(padd, 0, out, pos, padd.length);
         pos += padd.length;
-        byte[] tmp = back(Util.longToBytes(n));
+        byte[] tmp = back(SMCommonUtil.longToBytes(n));
         System.arraycopy(tmp, 0, out, pos, tmp.length);
         return out;
     }

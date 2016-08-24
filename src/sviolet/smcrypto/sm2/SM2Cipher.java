@@ -12,7 +12,7 @@ import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECPoint;
 import sviolet.smcrypto.exception.*;
 import sviolet.smcrypto.sm3.SM3Digest;
-import sviolet.smcrypto.util.Util;
+import sviolet.smcrypto.util.SMCommonUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -260,7 +260,7 @@ public class SM2Cipher {
             c2[i] ^= alternateKey[alternateKeyOff++];
         }
 
-        byte p[] = Util.byteConvert32Bytes(alternateKeyPoint.getY().toBigInteger());
+        byte p[] = SMCommonUtil.byteConvert32Bytes(alternateKeyPoint.getY().toBigInteger());
         this.c3Digest.update(p);
         byte[] c3 = this.c3Digest.doFinal();
         reset();
@@ -378,7 +378,7 @@ public class SM2Cipher {
 
         this.c3Digest.update(c2, 0, c2.length);
 
-        byte p[] = Util.byteConvert32Bytes(alternateKeyPoint.getY().toBigInteger());
+        byte p[] = SMCommonUtil.byteConvert32Bytes(alternateKeyPoint.getY().toBigInteger());
         this.c3Digest.update(p, 0, p.length);
         byte[] verifyC3 = this.c3Digest.doFinal();
 
@@ -396,11 +396,11 @@ public class SM2Cipher {
         this.alternateKeyDigest = new SM3Digest();
         this.c3Digest = new SM3Digest();
 
-        byte p[] = Util.byteConvert32Bytes(alternateKeyPoint.getX().toBigInteger());
+        byte p[] = SMCommonUtil.byteConvert32Bytes(alternateKeyPoint.getX().toBigInteger());
         this.alternateKeyDigest.update(p);
         this.c3Digest.update(p, 0, p.length);
 
-        p = Util.byteConvert32Bytes(alternateKeyPoint.getY().toBigInteger());
+        p = SMCommonUtil.byteConvert32Bytes(alternateKeyPoint.getY().toBigInteger());
         this.alternateKeyDigest.update(p);
         this.alternateKeyCount = 1;
         nextKey();
@@ -548,22 +548,22 @@ public class SM2Cipher {
         digest.update((byte) (len & 0xFF));
         digest.update(userId);
 
-        byte[] p = Util.byteConvert32Bytes(SM2_ECC_A);
+        byte[] p = SMCommonUtil.byteConvert32Bytes(SM2_ECC_A);
         digest.update(p);
 
-        p = Util.byteConvert32Bytes(SM2_ECC_B);
+        p = SMCommonUtil.byteConvert32Bytes(SM2_ECC_B);
         digest.update(p);
 
-        p = Util.byteConvert32Bytes(SM2_ECC_GX);
+        p = SMCommonUtil.byteConvert32Bytes(SM2_ECC_GX);
         digest.update(p);
 
-        p = Util.byteConvert32Bytes(SM2_ECC_GY);
+        p = SMCommonUtil.byteConvert32Bytes(SM2_ECC_GY);
         digest.update(p);
 
-        p = Util.byteConvert32Bytes(userKey.getX().toBigInteger());
+        p = SMCommonUtil.byteConvert32Bytes(userKey.getX().toBigInteger());
         digest.update(p);
 
-        p = Util.byteConvert32Bytes(userKey.getY().toBigInteger());
+        p = SMCommonUtil.byteConvert32Bytes(userKey.getY().toBigInteger());
         digest.update(p);
 
         return digest.doFinal();
