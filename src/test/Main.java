@@ -4,6 +4,7 @@ import sviolet.smcrypto.exception.InvalidCryptoDataException;
 import sviolet.smcrypto.exception.InvalidKeyException;
 import sviolet.smcrypto.exception.InvalidSignDataException;
 import sviolet.smcrypto.sm2.SM2Cipher;
+import sviolet.smcrypto.sm3.SM3Digest;
 
 /**
  * Created by S.Violet on 2016/8/22.
@@ -16,28 +17,26 @@ public class Main {
     private static String ms2privatekey = "3690655E33D5EA3D9A4AE1A1ADD766FDEA045CDEAA43A9206FB8C430CEFE0D94";
 
     public static void main(String[] args) throws InvalidKeyException, InvalidCryptoDataException, InvalidSignDataException {
-//        SM3Digest digest = new SM3Digest();
-//        digest.update(ByteUtils.hexToBytes(sm3content));
-//        byte[] sm3result = digest.doFinal();
-//        System.out.println(ByteUtils.bytesToHex(sm3result));
+        SM3Digest digest = new SM3Digest();
+        digest.update(ByteUtils.hexToBytes(sm3content));
+        byte[] sm3result = digest.doFinal();
+        System.out.println("sm3:" + ByteUtils.bytesToHex(sm3result));
 
-//        SM2Cipher cipher = new SM2Cipher(SM2Cipher.Type.C1C3C2);
-//        byte[] sm2result = cipher.encrypt(ByteUtils.hexToBytes(sm2publickey), sm2content.getBytes());
-//        System.out.println(ByteUtils.bytesToHex(sm2result));
-//        byte[] sm2result2 = cipher.decrypt(ByteUtils.hexToBytes(ms2privatekey), ByteUtils.hexToBytes(ByteUtils.bytesToHex(sm2result)));
-//        System.out.println(new String(sm2result2));
-//
-//        SM2Cipher.KeyPair keyPair = cipher.generateKeyPair();
-//        System.out.println(ByteUtils.bytesToHex(keyPair.getPrivateKey()));
-//        System.out.println(ByteUtils.bytesToHex(keyPair.getPublicKey()));
+        SM2Cipher cipher = new SM2Cipher(SM2Cipher.Type.C1C3C2);
+        byte[] sm2result = cipher.encrypt(ByteUtils.hexToBytes(sm2publickey), sm2content.getBytes());
+        System.out.println("sm2 encrypt:" + ByteUtils.bytesToHex(sm2result));
+        byte[] sm2result2 = cipher.decrypt(ByteUtils.hexToBytes(ms2privatekey), ByteUtils.hexToBytes(ByteUtils.bytesToHex(sm2result)));
+        System.out.println("sm2 decrypt:" + new String(sm2result2));
+
+        SM2Cipher.KeyPair keyPair = cipher.generateKeyPair();
+        System.out.println("sm2 gen key private:" + ByteUtils.bytesToHex(keyPair.getPrivateKey()));
+        System.out.println("sm2 gen key public:" + ByteUtils.bytesToHex(keyPair.getPublicKey()));
 
         String plainText = "message digest";
         byte[] sourceData = plainText.getBytes();
 
         // 国密规范测试用户ID
         String userId = "ALICE123@YAHOO.COM";
-
-        SM2Cipher cipher = new SM2Cipher(SM2Cipher.Type.C1C3C2);
 
         byte[] c = cipher.signASN1(userId.getBytes(), ByteUtils.hexToBytes(ms2privatekey), sourceData);
         System.out.println("sign: " + ByteUtils.bytesToHex(c));

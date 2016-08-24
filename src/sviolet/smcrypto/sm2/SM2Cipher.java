@@ -153,6 +153,35 @@ public class SM2Cipher {
      * @param data      数据
      */
     public byte[] encrypt(byte[] publicKey, byte[] data) {
+        EncryptedData encryptedData = encryptInner(publicKey, data);
+        if (encryptedData == null){
+            return null;
+        }
+        byte[] c1 = encryptedData.c1;
+        byte[] c2 = encryptedData.c2;
+        byte[] c3 = encryptedData.c3;
+
+        //拼凑结果
+        byte[] result = new byte[97 + c2.length];
+        switch (type) {
+            case C1C2C3:
+                System.arraycopy(c1, 0, result, 0, 65);//C1:Point, 标志位1byte, 数据64byte
+                System.arraycopy(c2, 0, result, 65, c2.length);//C2:加密数据
+                System.arraycopy(c3, 0, result, 65 + c2.length, 32);//C3:摘要 32byte
+                break;
+            case C1C3C2:
+                System.arraycopy(c1, 0, result, 0, 65);//C1:Point, 标志位1byte, 数据64byte
+                System.arraycopy(c3, 0, result, 65, 32);//C3:摘要 32byte
+                System.arraycopy(c2, 0, result, 97, c2.length);//C2:加密数据
+                break;
+            default:
+                throw new InvalidCryptoParamsException("[SM2:Encrypt]invalid type(" + String.valueOf(type) + ")");
+        }
+
+        return result;
+    }
+
+    private EncryptedData encryptInner(byte[] publicKey, byte[] data) {
         if (publicKey == null || publicKey.length == 0) {
             throw new InvalidCryptoParamsException("[SM2:Encrypt]key is null");
         }
@@ -188,23 +217,7 @@ public class SM2Cipher {
         byte[] c3 = this.c3Digest.doFinal();
         reset();
 
-        byte[] result = new byte[97 + c2.length];
-        switch (type) {
-            case C1C2C3:
-                System.arraycopy(c1.getEncoded(), 0, result, 0, 65);//C1:Point, 标志位1byte, 数据64byte
-                System.arraycopy(c2, 0, result, 65, c2.length);//C2:加密数据
-                System.arraycopy(c3, 0, result, 65 + c2.length, 32);//C3:摘要 32byte
-                break;
-            case C1C3C2:
-                System.arraycopy(c1.getEncoded(), 0, result, 0, 65);//C1:Point, 标志位1byte, 数据64byte
-                System.arraycopy(c3, 0, result, 65, 32);//C3:摘要 32byte
-                System.arraycopy(c2, 0, result, 97, c2.length);//C2:加密数据
-                break;
-            default:
-                throw new InvalidCryptoParamsException("[SM2:Encrypt]invalid type(" + String.valueOf(type) + ")");
-        }
-
-        return result;
+        return new EncryptedData(c1.getEncoded(), c2, c3);
     }
 
     /**
@@ -214,9 +227,6 @@ public class SM2Cipher {
      * @param data       数据
      */
     public byte[] decrypt(byte[] privateKey, byte[] data) throws InvalidKeyException, InvalidCryptoDataException {
-        if (privateKey == null || privateKey.length == 0) {
-            throw new InvalidCryptoParamsException("[SM2:Decrypt]key is null");
-        }
 
         if (data == null || data.length == 0) {
             return null;
@@ -242,6 +252,25 @@ public class SM2Cipher {
                 break;
             default:
                 throw new InvalidCryptoParamsException("[SM2:Decrypt]invalid type(" + String.valueOf(type) + ")");
+        }
+
+        return decryptInner(privateKey, new EncryptedData(c1, c2, c3));
+    }
+
+    private byte[] decryptInner(byte[] privateKey, EncryptedData encryptedData) throws InvalidKeyException, InvalidCryptoDataException {
+        if (privateKey == null || privateKey.length == 0) {
+            throw new InvalidCryptoParamsException("[SM2:Decrypt]key is null");
+        }
+
+        if (encryptedData == null){
+            return null;
+        }
+        byte[] c1 = encryptedData.c1;
+        byte[] c2 = encryptedData.c2;
+        byte[] c3 = encryptedData.c3;
+
+        if (c1 == null || c1.length <= 0 || c2 == null || c2.length <= 0 || c3 == null || c3.length <= 0){
+            throw new InvalidCryptoDataException("[SM2:Decrypt]invalid encrypt data, c1 / c2 / c3 is null or empty");
         }
 
         BigInteger decryptKey = new BigInteger(1, privateKey);
@@ -515,6 +544,19 @@ public class SM2Cipher {
     public enum Type {
         C1C2C3,
         C1C3C2
+    }
+
+    private static class EncryptedData{
+
+        private byte[] c1;
+        private byte[] c2;
+        private byte[] c3;
+
+        private EncryptedData(byte[] c1, byte[] c2, byte[] c3) {
+            this.c1 = c1;
+            this.c2 = c2;
+            this.c3 = c3;
+        }
     }
 
 }
