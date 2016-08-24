@@ -1,6 +1,8 @@
 package sviolet.smcrypto.sm2;
 
 import org.bouncycastle.asn1.*;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x509.X509CertificateStructure;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator;
 import org.bouncycastle.crypto.params.ECDomainParameters;
@@ -12,6 +14,7 @@ import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECPoint;
 import sviolet.smcrypto.exception.*;
 import sviolet.smcrypto.sm3.SM3Digest;
+import sviolet.smcrypto.util.CertificateUtils;
 import sviolet.smcrypto.util.SMCommonUtil;
 
 import java.io.ByteArrayInputStream;
@@ -46,6 +49,8 @@ public class SM2Cipher {
 //    private static final BigInteger SM2_ECC_N = new BigInteger("8542D69E4C044F18E8B92435BF6FF7DD297720630485628D5AE74EE7C32E79B7", 16);
 //    private static final BigInteger SM2_ECC_GX = new BigInteger("421DEBD61B62EAB6746434EBC3CC315E32220B3BADD50BDC4C4E6C147FEDD43D", 16);
 //    private static final BigInteger SM2_ECC_GY = new BigInteger("0680512BCBB42C07D47349D2153B70C4E5D7FDFCBFA36EA1A85841B9E46E09A2", 16);
+
+    private static final byte[] DEFAULT_USER_ID = "1234567812345678".getBytes();
 
     private ECCurve.Fp curve;//ECC曲线
     private ECPoint.Fp pointG;//基点
@@ -540,8 +545,37 @@ public class SM2Cipher {
         return verifySign(userId, publicKey, sourceData, r, s);
     }
 
+    /**
+     * <p>使用X509证书中的主体公钥进行验签</p>
+     *
+     * <p>注意:本方法不验证证书本身的合法性, 需要自行验证; 本方法不验证证书实体公钥的算法标识;</p>
+     *
+     * @param certData X509证书数据(ASN.1, 非Base64)
+     * @param sourceData 数据
+     * @param signData 签名
+     * @return true:签名合法
+     */
+    public boolean verifySignByX509Cert(byte[] certData, byte[] sourceData, byte[] signData) throws InvalidCertificateException, InvalidSignDataException, InvalidKeyDataException {
+        byte[] publicKey = null;
+        try {
+            X509CertificateStructure cert = CertificateUtils.parseX509(certData);
+            SubjectPublicKeyInfo publicInfo = cert.getSubjectPublicKeyInfo();
+            publicKey = publicInfo.getPublicKeyData().getBytes();
+        } catch (Exception e){
+            throw new InvalidCertificateException("[SM2:verifySignByX509Cert]illegal cert", e);
+        }
+        if (publicKey == null){
+            throw new InvalidCertificateException("[SM2:verifySignByX509Cert]null public key in cert");
+        }
+        return verifySignASN1(null, publicKey, sourceData, signData);
+    }
+
     private byte[] getZ(byte[] userId, ECPoint userKey) {
         SM3Digest digest = new SM3Digest();
+
+        if (userId == null){
+            userId = DEFAULT_USER_ID;
+        }
 
         int len = userId.length * 8;
         digest.update((byte) (len >> 8 & 0xFF));
