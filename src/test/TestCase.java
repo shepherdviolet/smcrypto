@@ -9,7 +9,7 @@ import sviolet.smcrypto.sm3.SM3Digest;
 /**
  * Created by S.Violet on 2016/8/22.
  */
-public class Main {
+public class TestCase {
 
     private static String sm3content = "64055D80810171DCE32D71773ECFDC803203539DB5677401DDD6A2B538D0652978479B5BE524FE809CB35499BDCC4C8FC1081CB2E09BCB4458828C5168BE329D";
     private static String sm2content = "ererfeiisgod";
