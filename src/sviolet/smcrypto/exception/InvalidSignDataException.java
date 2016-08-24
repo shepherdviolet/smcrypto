@@ -1,7 +1,7 @@
 package sviolet.smcrypto.exception;
 
 /**
- * 签名数据错误
+ * 签名数据无效
  *
  * Created by S.Violet on 2016/8/23.
  */

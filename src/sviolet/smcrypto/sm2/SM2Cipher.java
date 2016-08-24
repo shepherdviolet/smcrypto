@@ -10,14 +10,12 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters;
 import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECPoint;
-import sviolet.smcrypto.exception.InvalidCryptoDataException;
-import sviolet.smcrypto.exception.InvalidCryptoParamsException;
-import sviolet.smcrypto.exception.InvalidKeyException;
-import sviolet.smcrypto.exception.InvalidSignDataException;
+import sviolet.smcrypto.exception.*;
 import sviolet.smcrypto.sm3.SM3Digest;
 import sviolet.smcrypto.util.Util;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.SecureRandom;
@@ -152,12 +150,12 @@ public class SM2Cipher {
      * @param publicKey 公钥
      * @param data      数据
      */
-    public byte[] encrypt(byte[] publicKey, byte[] data) {
+    public byte[] encrypt(byte[] publicKey, byte[] data) throws InvalidKeyDataException {
         EncryptedData encryptedData = encryptInner(publicKey, data);
-        if (encryptedData == null){
+        if (encryptedData == null) {
             return null;
         }
-        byte[] c1 = encryptedData.c1;
+        byte[] c1 = encryptedData.c1.getEncoded();
         byte[] c2 = encryptedData.c2;
         byte[] c3 = encryptedData.c3;
 
@@ -181,7 +179,52 @@ public class SM2Cipher {
         return result;
     }
 
-    private EncryptedData encryptInner(byte[] publicKey, byte[] data) {
+    /**
+     * SM2加密, ASN.1编码
+     *
+     * @param publicKey 公钥
+     * @param data      数据
+     */
+    public byte[] encryptASN1(byte[] publicKey, byte[] data) throws InvalidCryptoDataException, InvalidKeyDataException {
+        EncryptedData encryptedData = encryptInner(publicKey, data);
+        if (encryptedData == null) {
+            return null;
+        }
+        ECPoint c1 = encryptedData.c1;
+        byte[] c2 = encryptedData.c2;
+        byte[] c3 = encryptedData.c3;
+
+        DERInteger x = new DERInteger(c1.getX().toBigInteger());
+        DERInteger y = new DERInteger(c1.getY().toBigInteger());
+        DEROctetString derC2 = new DEROctetString(c2);
+        DEROctetString derC3 = new DEROctetString(c3);
+        ASN1EncodableVector vector = new ASN1EncodableVector();
+        vector.add(x);
+        vector.add(y);
+        switch (type) {
+            case C1C2C3:
+                vector.add(derC2);
+                vector.add(derC3);
+                break;
+            case C1C3C2:
+                vector.add(derC3);
+                vector.add(derC2);
+                break;
+            default:
+                throw new InvalidCryptoParamsException("[SM2:EncryptASN1]invalid type(" + String.valueOf(type) + ")");
+        }
+        DERSequence seq = new DERSequence(vector);
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        DEROutputStream derOutputStream = new DEROutputStream(byteArrayOutputStream);
+        try {
+            derOutputStream.writeObject(seq);
+        }catch (IOException e){
+            throw new InvalidCryptoDataException("[SM2:encrypt:ASN1]error while parse encrypted data to ASN.1", e);
+        }
+        return byteArrayOutputStream.toByteArray();
+    }
+
+    private EncryptedData encryptInner(byte[] publicKey, byte[] data) throws InvalidKeyDataException {
         if (publicKey == null || publicKey.length == 0) {
             throw new InvalidCryptoParamsException("[SM2:Encrypt]key is null");
         }
@@ -194,7 +237,12 @@ public class SM2Cipher {
         byte[] c2 = new byte[data.length];
         System.arraycopy(data, 0, c2, 0, data.length);
 
-        ECPoint keyPoint = curve.decodePoint(publicKey);
+        ECPoint keyPoint;
+        try {
+            keyPoint = curve.decodePoint(publicKey);
+        }catch (Exception e){
+            throw new InvalidKeyDataException("[SM2:Encrypt]invalid key data(format)", e);
+        }
 
         AsymmetricCipherKeyPair generatedKey = keyPairGenerator.generateKeyPair();
         ECPrivateKeyParameters privateKeyParams = (ECPrivateKeyParameters) generatedKey.getPrivate();
@@ -217,7 +265,7 @@ public class SM2Cipher {
         byte[] c3 = this.c3Digest.doFinal();
         reset();
 
-        return new EncryptedData(c1.getEncoded(), c2, c3);
+        return new EncryptedData(c1, c2, c3);
     }
 
     /**
@@ -227,7 +275,6 @@ public class SM2Cipher {
      * @param data       数据
      */
     public byte[] decrypt(byte[] privateKey, byte[] data) throws InvalidKeyException, InvalidCryptoDataException {
-
         if (data == null || data.length == 0) {
             return null;
         }
@@ -254,27 +301,71 @@ public class SM2Cipher {
                 throw new InvalidCryptoParamsException("[SM2:Decrypt]invalid type(" + String.valueOf(type) + ")");
         }
 
-        return decryptInner(privateKey, new EncryptedData(c1, c2, c3));
+        return decryptInner(privateKey, c1, c2, c3);
     }
 
-    private byte[] decryptInner(byte[] privateKey, EncryptedData encryptedData) throws InvalidKeyException, InvalidCryptoDataException {
+    /**
+     * SM2解密, ASN.1编码
+     *
+     * @param privateKey 私钥
+     * @param data       数据
+     */
+    public byte[] decryptASN1(byte[] privateKey, byte[] data) throws InvalidKeyException, InvalidCryptoDataException {
+        if (data == null || data.length == 0) {
+            return null;
+        }
+
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data);
+        ASN1InputStream asn1InputStream = new ASN1InputStream(byteArrayInputStream);
+        DERObject derObj;
+        try{
+            derObj = asn1InputStream.readObject();
+        }catch (IOException e){
+            throw new InvalidCryptoDataException("[SM2:decrypt:ASN1]invalid encrypted data", e);
+        }
+        ASN1Sequence asn1 = (ASN1Sequence) derObj;
+        DERInteger x = (DERInteger) asn1.getObjectAt(0);
+        DERInteger y = (DERInteger) asn1.getObjectAt(1);
+        ECPoint c1;
+        try {
+            c1 = curve.createPoint(x.getValue(), y.getValue(), true);
+        }catch (Exception e){
+            throw new InvalidCryptoDataException("[SM2:decrypt:ASN1]invalid encrypted data, c1", e);
+        }
+        byte[] c2;
+        byte[] c3;
+        switch (type) {
+            case C1C2C3:
+                c2 = ((DEROctetString) asn1.getObjectAt(2)).getOctets();
+                c3 = ((DEROctetString) asn1.getObjectAt(3)).getOctets();
+                break;
+            case C1C3C2:
+                c3 = ((DEROctetString) asn1.getObjectAt(2)).getOctets();
+                c2 = ((DEROctetString) asn1.getObjectAt(3)).getOctets();
+                break;
+            default:
+                throw new InvalidCryptoParamsException("[SM2:Decrypt:ASN1]invalid type(" + String.valueOf(type) + ")");
+        }
+
+        return decryptInner(privateKey, c1.getEncoded(), c2, c3);
+    }
+
+    private byte[] decryptInner(byte[] privateKey, byte[] c1, byte[] c2, byte[] c3) throws InvalidKeyException, InvalidCryptoDataException {
         if (privateKey == null || privateKey.length == 0) {
             throw new InvalidCryptoParamsException("[SM2:Decrypt]key is null");
         }
 
-        if (encryptedData == null){
-            return null;
-        }
-        byte[] c1 = encryptedData.c1;
-        byte[] c2 = encryptedData.c2;
-        byte[] c3 = encryptedData.c3;
-
-        if (c1 == null || c1.length <= 0 || c2 == null || c2.length <= 0 || c3 == null || c3.length <= 0){
+        if (c1 == null || c1.length <= 0 || c2 == null || c2.length <= 0 || c3 == null || c3.length <= 0) {
             throw new InvalidCryptoDataException("[SM2:Decrypt]invalid encrypt data, c1 / c2 / c3 is null or empty");
         }
 
         BigInteger decryptKey = new BigInteger(1, privateKey);
-        ECPoint c1Point = curve.decodePoint(c1);
+        ECPoint c1Point;
+        try {
+            c1Point = curve.decodePoint(c1);
+        }catch (Exception e){
+            throw new InvalidCryptoDataException("[SM2:Decrypt]invalid encrypt data, c1 invalid", e);
+        }
         this.alternateKeyPoint = c1Point.multiply(decryptKey);
         reset();
 
@@ -328,7 +419,8 @@ public class SM2Cipher {
 
     /**
      * 签名
-     * @param userId 用户ID
+     *
+     * @param userId     用户ID
      * @param privateKey 私钥
      * @param sourceData 数据
      * @return 签名数据{r, s}
@@ -361,12 +453,13 @@ public class SM2Cipher {
 
     /**
      * 签名(ASN.1编码)
-     * @param userId 用户ID
+     *
+     * @param userId     用户ID
      * @param privateKey 私钥
      * @param sourceData 数据
      * @return 签名数据 byte[] ASN.1编码
      */
-    public byte[] signASN1(byte[] userId, byte[] privateKey, byte[] sourceData){
+    public byte[] signASN1(byte[] userId, byte[] privateKey, byte[] sourceData) {
         BigInteger[] signData = sign(userId, privateKey, sourceData);
         //签名数据序列化
         DERInteger derR = new DERInteger(signData[0]);//r
@@ -380,14 +473,15 @@ public class SM2Cipher {
 
     /**
      * 验签
-     * @param userId 用户ID
-     * @param publicKey 公钥
+     *
+     * @param userId     用户ID
+     * @param publicKey  公钥
      * @param sourceData 数据
-     * @param signR 签名数据r
-     * @param signS 签名数据s
+     * @param signR      签名数据r
+     * @param signS      签名数据s
      * @return true:签名有效
      */
-    public boolean verifySign(byte[] userId, byte[] publicKey, byte[] sourceData, BigInteger signR, BigInteger signS){
+    public boolean verifySign(byte[] userId, byte[] publicKey, byte[] sourceData, BigInteger signR, BigInteger signS) throws InvalidKeyDataException {
         if (publicKey == null || publicKey.length == 0) {
             throw new InvalidCryptoParamsException("[SM2:verifySign]key is null");
         }
@@ -397,7 +491,12 @@ public class SM2Cipher {
         }
 
         //公钥
-        ECPoint key = curve.decodePoint(publicKey);
+        ECPoint key;
+        try {
+            key = curve.decodePoint(publicKey);
+        }catch (Exception e){
+            throw new InvalidKeyDataException("[SM2:verifySign]invalid public key (format)", e);
+        }
 
         //Z
         SM3Digest digest = new SM3Digest();
@@ -414,15 +513,16 @@ public class SM2Cipher {
 
     /**
      * 验签(ASN.1编码签名)
-     * @param userId 用户ID
-     * @param publicKey 公钥
+     *
+     * @param userId     用户ID
+     * @param publicKey  公钥
      * @param sourceData 数据
-     * @param signData 签名数据(ASN.1编码)
+     * @param signData   签名数据(ASN.1编码)
      * @return true 签名有效
      * @throws InvalidSignDataException ASN.1编码无效
      */
     @SuppressWarnings("unchecked")
-    public boolean verifySignASN1(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException{
+    public boolean verifySignASN1(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException, InvalidKeyDataException {
 
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(signData);
         ASN1InputStream asn1InputStream = new ASN1InputStream(byteArrayInputStream);
@@ -430,7 +530,7 @@ public class SM2Cipher {
         try {
             DERObject derObj = asn1InputStream.readObject();
             signObj = ((ASN1Sequence) derObj).getObjects();
-        } catch (IOException e){
+        } catch (IOException e) {
             throw new InvalidSignDataException("[SM2:verifySign]invalid sign data (ASN.1)", e);
         }
         BigInteger r = signObj.nextElement().getValue();
@@ -546,13 +646,13 @@ public class SM2Cipher {
         C1C3C2
     }
 
-    private static class EncryptedData{
+    private static class EncryptedData {
 
-        private byte[] c1;
+        private ECPoint c1;
         private byte[] c2;
         private byte[] c3;
 
-        private EncryptedData(byte[] c1, byte[] c2, byte[] c3) {
+        private EncryptedData(ECPoint c1, byte[] c2, byte[] c3) {
             this.c1 = c1;
             this.c2 = c2;
             this.c3 = c3;
