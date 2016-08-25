@@ -50,7 +50,11 @@ public class SM2Cipher {
 //    private static final BigInteger SM2_ECC_GX = new BigInteger("421DEBD61B62EAB6746434EBC3CC315E32220B3BADD50BDC4C4E6C147FEDD43D", 16);
 //    private static final BigInteger SM2_ECC_GY = new BigInteger("0680512BCBB42C07D47349D2153B70C4E5D7FDFCBFA36EA1A85841B9E46E09A2", 16);
 
+    //默认用户ID(签名用)
     private static final byte[] DEFAULT_USER_ID = "1234567812345678".getBytes();
+
+    //SM2签名标志位(头一个byte)
+    private static final byte[] BYTES_SIGN_PREFIX = {0x04};
 
     private ECCurve.Fp curve;//ECC曲线
     private ECPoint.Fp pointG;//基点
@@ -190,7 +194,7 @@ public class SM2Cipher {
      * @param publicKey 公钥
      * @param data      数据
      */
-    public byte[] encryptASN1(byte[] publicKey, byte[] data) throws InvalidCryptoDataException, InvalidKeyDataException {
+    public byte[] encryptToASN1(byte[] publicKey, byte[] data) throws InvalidCryptoDataException, InvalidKeyDataException {
         EncryptedData encryptedData = encryptInner(publicKey, data);
         if (encryptedData == null) {
             return null;
@@ -223,7 +227,7 @@ public class SM2Cipher {
         DEROutputStream derOutputStream = new DEROutputStream(byteArrayOutputStream);
         try {
             derOutputStream.writeObject(seq);
-        }catch (IOException e){
+        } catch (IOException e) {
             throw new InvalidCryptoDataException("[SM2:encrypt:ASN1]error while parse encrypted data to ASN.1", e);
         }
         return byteArrayOutputStream.toByteArray();
@@ -245,7 +249,7 @@ public class SM2Cipher {
         ECPoint keyPoint;
         try {
             keyPoint = curve.decodePoint(publicKey);
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new InvalidKeyDataException("[SM2:Encrypt]invalid key data(format)", e);
         }
 
@@ -315,7 +319,7 @@ public class SM2Cipher {
      * @param privateKey 私钥
      * @param data       数据
      */
-    public byte[] decryptASN1(byte[] privateKey, byte[] data) throws InvalidKeyException, InvalidCryptoDataException {
+    public byte[] decryptFromASN1(byte[] privateKey, byte[] data) throws InvalidKeyException, InvalidCryptoDataException {
         if (data == null || data.length == 0) {
             return null;
         }
@@ -323,9 +327,9 @@ public class SM2Cipher {
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data);
         ASN1InputStream asn1InputStream = new ASN1InputStream(byteArrayInputStream);
         DERObject derObj;
-        try{
+        try {
             derObj = asn1InputStream.readObject();
-        }catch (IOException e){
+        } catch (IOException e) {
             throw new InvalidCryptoDataException("[SM2:decrypt:ASN1]invalid encrypted data", e);
         }
         ASN1Sequence asn1 = (ASN1Sequence) derObj;
@@ -334,7 +338,7 @@ public class SM2Cipher {
         ECPoint c1;
         try {
             c1 = curve.createPoint(x.getValue(), y.getValue(), true);
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new InvalidCryptoDataException("[SM2:decrypt:ASN1]invalid encrypted data, c1", e);
         }
         byte[] c2;
@@ -368,7 +372,7 @@ public class SM2Cipher {
         ECPoint c1Point;
         try {
             c1Point = curve.decodePoint(c1);
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new InvalidCryptoDataException("[SM2:Decrypt]invalid encrypt data, c1 invalid", e);
         }
         this.alternateKeyPoint = c1Point.multiply(decryptKey);
@@ -457,6 +461,35 @@ public class SM2Cipher {
     }
 
     /**
+     * 签名, 输出(04 + r + s)格式的标准签名
+     *
+     * @param userId     用户ID
+     * @param privateKey 私钥
+     * @param sourceData 数据
+     * @return 签名数据{r, s}
+     */
+    public byte[] signToBytes(byte[] userId, byte[] privateKey, byte[] sourceData) {
+        BigInteger[] rs = sign(userId, privateKey, sourceData);
+        byte[] signData = new byte[65];//1bytes 标志位04, 32bytes r, 32bytes s
+        byte[] rBytes = rs[0].toByteArray();//出来不一定是32byte, 而且可能前面带0x00
+        byte[] sBytes = rs[1].toByteArray();//出来不一定是32byte, 而且可能前面带0x00
+        System.arraycopy(BYTES_SIGN_PREFIX, 0, signData, 0, 1);
+        System.arraycopy(
+                rBytes,
+                rBytes.length > 32 ? rBytes.length - 32 : 0,
+                signData,
+                rBytes.length >= 32 ? 1 : 1 + (32 - rBytes.length),
+                rBytes.length >= 32 ? 32 : rBytes.length);
+        System.arraycopy(
+                sBytes,
+                sBytes.length > 32 ? sBytes.length - 32 : 0,
+                signData,
+                sBytes.length >= 32 ? 33 : 33 + (32 - sBytes.length),
+                sBytes.length >= 32 ? 32 : sBytes.length);
+        return signData;
+    }
+
+    /**
      * 签名(ASN.1编码)
      *
      * @param userId     用户ID
@@ -464,7 +497,7 @@ public class SM2Cipher {
      * @param sourceData 数据
      * @return 签名数据 byte[] ASN.1编码
      */
-    public byte[] signASN1(byte[] userId, byte[] privateKey, byte[] sourceData) {
+    public byte[] signToASN1(byte[] userId, byte[] privateKey, byte[] sourceData) {
         BigInteger[] signData = sign(userId, privateKey, sourceData);
         //签名数据序列化
         DERInteger derR = new DERInteger(signData[0]);//r
@@ -499,7 +532,7 @@ public class SM2Cipher {
         ECPoint key;
         try {
             key = curve.decodePoint(publicKey);
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new InvalidKeyDataException("[SM2:verifySign]invalid public key (format)", e);
         }
 
@@ -517,6 +550,35 @@ public class SM2Cipher {
     }
 
     /**
+     * 验签((04 + r + s)格式的标准签名)
+     *
+     * @param userId     用户ID
+     * @param publicKey  公钥
+     * @param sourceData 数据
+     * @param signData   签名数据, (04 + r + s)格式的标准签名
+     * @return true 签名有效
+     * @throws InvalidSignDataException ASN.1编码无效
+     */
+    public boolean verifySignByBytes(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException, InvalidKeyDataException {
+        if (signData == null || signData.length != 65) {
+            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, length is not 65 (0x04 + r + s)");
+        }
+        byte[] rBytes = new byte[32];
+        byte[] sBytes = new byte[32];
+        System.arraycopy(signData, 1, rBytes, 0, 32);
+        System.arraycopy(signData, 33, sBytes, 0, 32);
+        BigInteger r;
+        BigInteger s;
+        try {
+            r = new BigInteger(1, rBytes);
+            s = new BigInteger(1, sBytes);
+        } catch (Exception e) {
+            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, can not parse to r and s (BigInteger)");
+        }
+        return verifySign(userId, publicKey, sourceData, r, s);
+    }
+
+    /**
      * 验签(ASN.1编码签名)
      *
      * @param userId     用户ID
@@ -527,7 +589,7 @@ public class SM2Cipher {
      * @throws InvalidSignDataException ASN.1编码无效
      */
     @SuppressWarnings("unchecked")
-    public boolean verifySignASN1(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException, InvalidKeyDataException {
+    public boolean verifySignByASN1(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException, InvalidKeyDataException {
 
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(signData);
         ASN1InputStream asn1InputStream = new ASN1InputStream(byteArrayInputStream);
@@ -547,12 +609,12 @@ public class SM2Cipher {
 
     /**
      * <p>使用X509证书中的主体公钥进行验签</p>
-     *
+     * <p>
      * <p>注意:本方法不验证证书本身的合法性, 需要自行验证; 本方法不验证证书实体公钥的算法标识;</p>
      *
-     * @param certData X509证书数据(ASN.1, 非Base64)
+     * @param certData   X509证书数据(ASN.1, 非Base64)
      * @param sourceData 数据
-     * @param signData 签名
+     * @param signData   签名
      * @return true:签名合法
      */
     public boolean verifySignByX509Cert(byte[] certData, byte[] sourceData, byte[] signData) throws InvalidCertificateException, InvalidSignDataException, InvalidKeyDataException {
@@ -561,19 +623,22 @@ public class SM2Cipher {
             X509CertificateStructure cert = CertificateUtils.parseX509(certData);
             SubjectPublicKeyInfo publicInfo = cert.getSubjectPublicKeyInfo();
             publicKey = publicInfo.getPublicKeyData().getBytes();
-        } catch (Exception e){
+        } catch (Exception e) {
             throw new InvalidCertificateException("[SM2:verifySignByX509Cert]illegal cert", e);
         }
-        if (publicKey == null){
+        if (publicKey == null) {
             throw new InvalidCertificateException("[SM2:verifySignByX509Cert]null public key in cert");
         }
-        return verifySignASN1(null, publicKey, sourceData, signData);
+        if (publicKey.length != 65) {
+            throw new InvalidCertificateException("[SM2:verifySignByX509Cert]illegal public key in cert, length is not 64 bytes");
+        }
+        return verifySignByBytes(null, publicKey, sourceData, signData);
     }
 
     private byte[] getZ(byte[] userId, ECPoint userKey) {
         SM3Digest digest = new SM3Digest();
 
-        if (userId == null){
+        if (userId == null) {
             userId = DEFAULT_USER_ID;
         }
 

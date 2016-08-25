@@ -37,10 +37,10 @@ public class TestCase {
         // 国密规范测试用户ID
         String userId = "ALICE123@YAHOO.COM";
 
-        byte[] c = cipher.signASN1(userId.getBytes(), ByteUtils.hexToBytes(ms2privatekey), sourceData);
+        byte[] c = cipher.signToBytes(userId.getBytes(), ByteUtils.hexToBytes(ms2privatekey), sourceData);
         System.out.println("sign: " + ByteUtils.bytesToHex(c));
 
-        boolean vs = cipher.verifySignASN1(userId.getBytes(), ByteUtils.hexToBytes(sm2publickey), ByteUtils.hexToBytes(ByteUtils.bytesToHex(sourceData)), ByteUtils.hexToBytes(ByteUtils.bytesToHex(c)));
+        boolean vs = cipher.verifySignByBytes(userId.getBytes(), ByteUtils.hexToBytes(sm2publickey), ByteUtils.hexToBytes(ByteUtils.bytesToHex(sourceData)), ByteUtils.hexToBytes(ByteUtils.bytesToHex(c)));
         System.out.println("验签结果: " + vs);
 
     }
