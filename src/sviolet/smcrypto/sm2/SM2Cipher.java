@@ -618,7 +618,7 @@ public class SM2Cipher {
      *
      * @param certData   X509证书数据(ASN.1, 非Base64)
      * @param sourceData 数据
-     * @param signData   签名
+     * @param signData   签名(0x04 + r + s)
      * @return true:签名合法
      */
     public boolean verifySignByX509Cert(byte[] certData, byte[] sourceData, byte[] signData) throws InvalidCertificateException, InvalidSignDataException, InvalidKeyDataException {
@@ -637,22 +637,7 @@ public class SM2Cipher {
             throw new InvalidCertificateException("[SM2:verifySignByX509Cert]illegal public key in cert, length is not 64 bytes");
         }
 
-        if (signData == null || signData.length != 64) {
-            throw new InvalidSignDataException("[SM2:verifySignByX509Cert]invalid sign data, length is not 64 bytes (r + s)");
-        }
-        byte[] rBytes = new byte[32];
-        byte[] sBytes = new byte[32];
-        System.arraycopy(signData, 0, rBytes, 0, 32);
-        System.arraycopy(signData, 32, sBytes, 0, 32);
-        BigInteger r;
-        BigInteger s;
-        try {
-            r = new BigInteger(1, rBytes);
-            s = new BigInteger(1, sBytes);
-        } catch (Exception e) {
-            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, can not parse to r and s (BigInteger)");
-        }
-        return verifySign(null, publicKey, sourceData, r, s);
+        return verifySignByBytes(null, publicKey, sourceData, signData);
     }
 
     private byte[] getZ(byte[] userId, ECPoint userKey) {
