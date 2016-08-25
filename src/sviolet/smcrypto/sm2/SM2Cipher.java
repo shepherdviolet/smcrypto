@@ -68,6 +68,10 @@ public class SM2Cipher {
     private byte alternateKey[];
     private byte alternateKeyOff;
 
+    public SM2Cipher(){
+        this(Type.C1C3C2);
+    }
+
     /**
      * 默认椭圆曲线参数的SM2加密器
      *
@@ -561,7 +565,7 @@ public class SM2Cipher {
      */
     public boolean verifySignByBytes(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException, InvalidKeyDataException {
         if (signData == null || signData.length != 65) {
-            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, length is not 65 (0x04 + r + s)");
+            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, length is not 65 bytes (0x04 + r + s)");
         }
         byte[] rBytes = new byte[32];
         byte[] sBytes = new byte[32];
@@ -632,7 +636,23 @@ public class SM2Cipher {
         if (publicKey.length != 65) {
             throw new InvalidCertificateException("[SM2:verifySignByX509Cert]illegal public key in cert, length is not 64 bytes");
         }
-        return verifySignByBytes(null, publicKey, sourceData, signData);
+
+        if (signData == null || signData.length != 64) {
+            throw new InvalidSignDataException("[SM2:verifySignByX509Cert]invalid sign data, length is not 64 bytes (r + s)");
+        }
+        byte[] rBytes = new byte[32];
+        byte[] sBytes = new byte[32];
+        System.arraycopy(signData, 0, rBytes, 0, 32);
+        System.arraycopy(signData, 32, sBytes, 0, 32);
+        BigInteger r;
+        BigInteger s;
+        try {
+            r = new BigInteger(1, rBytes);
+            s = new BigInteger(1, sBytes);
+        } catch (Exception e) {
+            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, can not parse to r and s (BigInteger)");
+        }
+        return verifySign(null, publicKey, sourceData, r, s);
     }
 
     private byte[] getZ(byte[] userId, ECPoint userKey) {
