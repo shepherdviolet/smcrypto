@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/SMCypto.iml" filepath="$PROJECT_DIR$/SMCypto.iml" />
+      <module fileurl="file://$PROJECT_DIR$/SMCrypto.iml" filepath="$PROJECT_DIR$/SMCrypto.iml" />
     </modules>
   </component>
 </project>
