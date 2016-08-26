@@ -1,4 +1,4 @@
-package sviolet.smcrypto.sm3;
+package sviolet.smcrypto;
 
 import sviolet.smcrypto.util.CommonUtils;
 

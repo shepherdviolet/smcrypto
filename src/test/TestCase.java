@@ -4,8 +4,8 @@ import sviolet.smcrypto.exception.InvalidCryptoDataException;
 import sviolet.smcrypto.exception.InvalidKeyDataException;
 import sviolet.smcrypto.exception.InvalidKeyException;
 import sviolet.smcrypto.exception.InvalidSignDataException;
-import sviolet.smcrypto.sm2.SM2Cipher;
-import sviolet.smcrypto.sm3.SM3Digest;
+import sviolet.smcrypto.SM2Cipher;
+import sviolet.smcrypto.SM3Digest;
 
 
 public class TestCase {

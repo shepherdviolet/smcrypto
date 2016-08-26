@@ -1,4 +1,4 @@
-package sviolet.smcrypto.sm3;
+package sviolet.smcrypto;
 
 public class SM3Digest {
     //SM3值的长度

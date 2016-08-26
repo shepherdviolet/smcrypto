@@ -1,4 +1,4 @@
-package sviolet.smcrypto.sm2;
+package sviolet.smcrypto;
 
 import org.bouncycastle.asn1.*;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
@@ -13,7 +13,6 @@ import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECPoint;
 import sviolet.smcrypto.exception.*;
-import sviolet.smcrypto.sm3.SM3Digest;
 import sviolet.smcrypto.util.CertificateUtils;
 import sviolet.smcrypto.util.CommonUtils;
 

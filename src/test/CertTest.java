@@ -5,7 +5,7 @@ import org.bouncycastle.asn1.x509.X509CertificateStructure;
 import sviolet.smcrypto.exception.InvalidCertificateException;
 import sviolet.smcrypto.exception.InvalidKeyDataException;
 import sviolet.smcrypto.exception.InvalidSignDataException;
-import sviolet.smcrypto.sm2.SM2Cipher;
+import sviolet.smcrypto.SM2Cipher;
 import sviolet.smcrypto.util.Base64Utils;
 import sviolet.smcrypto.util.CertificateUtils;
 
