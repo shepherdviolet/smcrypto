@@ -2,7 +2,7 @@ package sviolet.smcrypto.util;
 
 import java.math.BigInteger;
 
-public class SMCommonUtil
+public class CommonUtils
 {
 	/**
 	 * 整形转换成网络传输的字节流（字节数组）型数据
