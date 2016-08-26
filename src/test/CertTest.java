@@ -61,7 +61,7 @@ public class CertTest {
     private static void dataVerify() throws InvalidCertificateException, InvalidSignDataException, InvalidKeyDataException {
         //数据验签
         String data = "jonllen";
-        String sign = "BOuC0z9QqYbVq3x5xQdzjMhLldfnouQ6QT2WN/VXkFG/VeskWD90m6QFor66T9auY9A/G+MUIneN9u0yvTbxG6w=";//0x04 + r + s 格式的签名
+        String sign = "64LTP1CphtWrfHnFB3OMyEuV1+ei5DpBPZY39VeQUb9V6yRYP3SbpAWivrpP1q5j0D8b4xQid4327TK9NvEbrA==";//r + s 格式的签名
         byte[] certBytes = Base64Utils.decode(certData2);
         byte[] signBytes = Base64Utils.decode(sign);
         System.out.println("certBytes:" + ByteUtils.bytesToHex(certBytes));

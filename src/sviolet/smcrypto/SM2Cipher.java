@@ -52,9 +52,6 @@ public class SM2Cipher {
     //默认用户ID(签名用)
     private static final byte[] DEFAULT_USER_ID = "1234567812345678".getBytes();
 
-    //SM2签名标志位(头一个byte)
-    private static final byte[] BYTES_SIGN_PREFIX = {0x04};
-
     private ECCurve.Fp curve;//ECC曲线
     private ECPoint.Fp pointG;//基点
     private ECKeyPairGenerator keyPairGenerator;//密钥对生成器
@@ -464,7 +461,7 @@ public class SM2Cipher {
     }
 
     /**
-     * 签名, 输出(04 + r + s)格式的标准签名
+     * 签名, 输出(r + s)格式的标准签名
      *
      * @param userId     用户ID
      * @param privateKey 私钥
@@ -473,21 +470,20 @@ public class SM2Cipher {
      */
     public byte[] signToBytes(byte[] userId, byte[] privateKey, byte[] sourceData) {
         BigInteger[] rs = sign(userId, privateKey, sourceData);
-        byte[] signData = new byte[65];//1bytes 标志位04, 32bytes r, 32bytes s
+        byte[] signData = new byte[64];//32bytes r, 32bytes s
         byte[] rBytes = rs[0].toByteArray();//出来不一定是32byte, 而且可能前面带0x00
         byte[] sBytes = rs[1].toByteArray();//出来不一定是32byte, 而且可能前面带0x00
-        System.arraycopy(BYTES_SIGN_PREFIX, 0, signData, 0, 1);
         System.arraycopy(
                 rBytes,
                 rBytes.length > 32 ? rBytes.length - 32 : 0,
                 signData,
-                rBytes.length >= 32 ? 1 : 1 + (32 - rBytes.length),
+                rBytes.length >= 32 ? 0 : 32 - rBytes.length,
                 rBytes.length >= 32 ? 32 : rBytes.length);
         System.arraycopy(
                 sBytes,
                 sBytes.length > 32 ? sBytes.length - 32 : 0,
                 signData,
-                sBytes.length >= 32 ? 33 : 33 + (32 - sBytes.length),
+                sBytes.length >= 32 ? 32 : 32 + (32 - sBytes.length),
                 sBytes.length >= 32 ? 32 : sBytes.length);
         return signData;
     }
@@ -553,23 +549,23 @@ public class SM2Cipher {
     }
 
     /**
-     * 验签((04 + r + s)格式的标准签名)
+     * 验签, (r + s)格式的标准签名
      *
      * @param userId     用户ID
      * @param publicKey  公钥
      * @param sourceData 数据
-     * @param signData   签名数据, (04 + r + s)格式的标准签名
+     * @param signData   签名数据, r + s格式的标准签名
      * @return true 签名有效
      * @throws InvalidSignDataException ASN.1编码无效
      */
     public boolean verifySignByBytes(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException, InvalidKeyDataException {
-        if (signData == null || signData.length != 65) {
-            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, length is not 65 bytes (0x04 + r + s)");
+        if (signData == null || signData.length != 64) {
+            throw new InvalidSignDataException("[SM2:verifySignByBytes]invalid sign data, length is not 64 bytes (r + s)");
         }
         byte[] rBytes = new byte[32];
         byte[] sBytes = new byte[32];
-        System.arraycopy(signData, 1, rBytes, 0, 32);
-        System.arraycopy(signData, 33, sBytes, 0, 32);
+        System.arraycopy(signData, 0, rBytes, 0, 32);
+        System.arraycopy(signData, 32, sBytes, 0, 32);
         BigInteger r;
         BigInteger s;
         try {
@@ -617,7 +613,7 @@ public class SM2Cipher {
      *
      * @param certData   X509证书数据(ASN.1, 非Base64)
      * @param sourceData 数据
-     * @param signData   签名(0x04 + r + s)
+     * @param signData   签名(r + s)
      * @return true:签名合法
      */
     public boolean verifySignByX509Cert(byte[] certData, byte[] sourceData, byte[] signData) throws InvalidCertificateException, InvalidSignDataException, InvalidKeyDataException {
@@ -633,7 +629,7 @@ public class SM2Cipher {
             throw new InvalidCertificateException("[SM2:verifySignByX509Cert]null public key in cert");
         }
         if (publicKey.length != 65) {
-            throw new InvalidCertificateException("[SM2:verifySignByX509Cert]illegal public key in cert, length is not 64 bytes");
+            throw new InvalidCertificateException("[SM2:verifySignByX509Cert]illegal public key in cert, length is not 65 bytes (0x04 + x + y)");
         }
 
         return verifySignByBytes(null, publicKey, sourceData, signData);
