@@ -1,5 +1,12 @@
 package sviolet.smcrypto;
 
+/**
+ * <p>SM3摘要器</p>
+ *
+ * <p>注意:由于对象内存在buffer, 请勿多线程同时操作一个实例, 每次new一个Cipher使用, 或使用ThreadLocal保持每个线程一个Cipher实例.</p>
+ *
+ * @author S.Violet
+ */
 public class SM3Digest {
     //SM3值的长度
     private static final int BYTE_LENGTH = 32;

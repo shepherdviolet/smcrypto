@@ -25,8 +25,10 @@ import java.util.Arrays;
 import java.util.Enumeration;
 
 /**
- * SM2加密器
- * <p>
+ * <p>SM2加密器</p>
+ *
+ * <p>注意:由于对象内存在buffer, 请勿多线程同时操作一个实例, 每次new一个Cipher使用, 或使用ThreadLocal保持每个线程一个Cipher实例.</p>
+ *
  * Created by S.Violet on 2016/8/22.
  */
 public class SM2Cipher {
