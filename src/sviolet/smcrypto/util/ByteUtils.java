@@ -17,7 +17,7 @@
  * Email: shepherdviolet@163.com
  */
 
-package test;
+package sviolet.smcrypto.util;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

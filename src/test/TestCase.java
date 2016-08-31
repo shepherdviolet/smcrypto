@@ -6,6 +6,7 @@ import sviolet.smcrypto.exception.InvalidCryptoDataException;
 import sviolet.smcrypto.exception.InvalidKeyDataException;
 import sviolet.smcrypto.exception.InvalidKeyException;
 import sviolet.smcrypto.exception.InvalidSignDataException;
+import sviolet.smcrypto.util.ByteUtils;
 
 import java.io.IOException;
 
