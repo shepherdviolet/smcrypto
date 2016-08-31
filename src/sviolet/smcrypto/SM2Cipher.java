@@ -13,6 +13,10 @@ import org.bouncycastle.math.ec.ECCurve;
 import org.bouncycastle.math.ec.ECFieldElement;
 import org.bouncycastle.math.ec.ECPoint;
 import sviolet.smcrypto.exception.*;
+import sviolet.smcrypto.tlv.IllegalPbocTlvFormatException;
+import sviolet.smcrypto.tlv.PbocTlvElement;
+import sviolet.smcrypto.tlv.PbocTlvParser;
+import sviolet.smcrypto.util.ByteUtils;
 import sviolet.smcrypto.util.CertificateUtils;
 import sviolet.smcrypto.util.CommonUtils;
 
@@ -23,6 +27,7 @@ import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.List;
 
 /**
  * <p>SM2加密器</p>
@@ -591,8 +596,22 @@ public class SM2Cipher {
      */
     @SuppressWarnings("unchecked")
     public boolean verifySignByASN1(byte[] userId, byte[] publicKey, byte[] sourceData, byte[] signData) throws InvalidSignDataException, InvalidKeyDataException {
+        byte[] _signData = signData;
 
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(signData);
+        //过滤头部的0x00
+        int startIndex = 0;
+        for (int i = 0 ; i < signData.length ; i++){
+            if (signData[i] != 0x00){
+                break;
+            }
+            startIndex++;
+        }
+        if (startIndex > 0){
+            _signData = new byte[signData.length - startIndex];
+            System.arraycopy(signData, startIndex, _signData, 0, _signData.length);
+        }
+
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(_signData);
         ASN1InputStream asn1InputStream = new ASN1InputStream(byteArrayInputStream);
         Enumeration<DERInteger> signObj;
         try {
@@ -635,6 +654,40 @@ public class SM2Cipher {
         }
 
         return verifySignByBytes(null, publicKey, sourceData, signData);
+    }
+
+    /**
+     * 根据公钥验证证书的合法性
+     * @param certData X509证书数据(ASN.1, 非Base64, TLV数据格式)
+     * @param publicKey 公钥
+     * @return true:合法
+     */
+    public boolean verifyCertByPublicKey(byte[] certData, byte[] publicKey) throws IOException, IllegalPbocTlvFormatException, InvalidSignDataException, InvalidKeyDataException {
+        PbocTlvElement root = PbocTlvParser.parse(certData);
+        List<PbocTlvElement> elements = root.getSubElements();
+        if (elements == null || elements.size() != 3){
+            throw new IOException("illegal cert, it must have 3 tags, cert info / flag / sign");
+        }
+
+        //被签名数据
+        PbocTlvElement certContentElement = elements.get(0);
+        byte[] certContentTag = certContentElement.getTag();//tag
+        byte[] certContentLength = certContentElement.getLength();//length
+        byte[] certContentValue = certContentElement.getValue();//value
+        if (certContentValue == null){
+            throw new IOException("illegal cert, tag 1 (cert info) has no value");
+        }
+        byte[] certContent = new byte[certContentTag.length + certContentLength.length + certContentValue.length];//被签名数据
+        System.arraycopy(certContentTag, 0, certContent, 0, certContentTag.length);
+        System.arraycopy(certContentLength, 0, certContent, certContentTag.length, certContentLength.length);
+        System.arraycopy(certContentValue, 0, certContent, certContentTag.length + certContentLength.length, certContentValue.length);
+
+        byte[] certSign = elements.get(2).getValue();
+        if (certSign == null){
+            throw new IOException("illegal cert, tag 3 (cert sign) has no value");
+        }
+
+        return verifySignByASN1(null, publicKey, certContent, certSign);
     }
 
     private byte[] getZ(byte[] userId, ECPoint userKey) {
