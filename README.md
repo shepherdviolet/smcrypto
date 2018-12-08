@@ -14,26 +14,18 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    //Common crypto utils
-    compile 'com.github.shepherdviolet:thistle-common:version'
     //Advanced crypto utils
-    compile 'com.github.shepherdviolet:thistle-crypto-plus:version'
+    compile 'com.github.shepherdviolet:thistle-crypto-plus:12.3'
 }
 
 ```
 
 ```maven
-    <!-- Common crypto utils -->
-    <dependency>    
-        <groupId>com.github.shepherdviolet</groupId>
-        <artifactId>thistle-common</artifactId>
-        <version>version</version> 
-    </dependency>
     <!-- Advanced crypto utils -->
     <dependency>    
         <groupId>com.github.shepherdviolet</groupId>
         <artifactId>thistle-crypto-plus</artifactId>
-        <version>version</version> 
+        <version>12.3</version> 
     </dependency>
 ```
 
